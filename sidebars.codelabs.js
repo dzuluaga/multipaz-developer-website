@@ -19,6 +19,23 @@
       'index',
       {
         type: 'category',
+        label: 'DPC Lifecycle Codelab',
+        link: {
+          type: 'doc',
+          id: 'DPC Lifecycle Codelab/index',
+        },
+        items: [
+          'DPC Lifecycle Codelab/Before You Begin',
+          'DPC Lifecycle Codelab/Issuance',
+          'DPC Lifecycle Codelab/Wallet',
+          'DPC Lifecycle Codelab/Verification',
+          'DPC Lifecycle Codelab/Next Steps',
+        ],
+        collapsed: false,
+        collapsible: true,
+      },
+      {
+        type: 'category',
         label: 'Utopia Wholesale Codelab',
         link: {
           type: 'doc',

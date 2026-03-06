@@ -12,6 +12,10 @@ require('dotenv').config();
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
+  markdown: {
+    mermaid: true,
+  },
+  themes: ['@docusaurus/theme-mermaid'],
   title: 'Multipaz',
   tagline: 'Multipaz is an identity framework designed to handle secure, real-world credential issuance and verification.',
   favicon: 'img/multipaz.png',
