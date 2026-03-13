@@ -1,0 +1,68 @@
+# Ask AI API Server
+
+Backend API for the Ask AI widget on the Multipaz developer website. Provides chat (Gemini), text-to-speech (ElevenLabs), and feedback collection (Google Sheets) endpoints.
+
+## Environment Variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `GEMINI_API_KEY` | Yes | Google Gemini API key for the chat endpoint |
+| `ELEVENLABS_API_KEY` | No | ElevenLabs API key for text-to-speech |
+| `ELEVENLABS_VOICE_ID` | No | ElevenLabs voice ID (default: `JBFqnCBsd6RMkjVDRZzb` — George) |
+| `ELEVENLABS_MODEL_ID` | No | ElevenLabs model (default: `eleven_turbo_v2_5`) |
+| `FEEDBACK_WEBHOOK_URL` | No | Google Apps Script web app URL for feedback collection |
+| `ALLOWED_ORIGINS` | No | Comma-separated allowed CORS origins (default: `http://localhost:3000,http://localhost:3001,http://localhost:3010`) |
+| `RATE_LIMIT_PER_MIN` | No | Max requests per IP per minute (default: `10`) |
+| `DAILY_REQUEST_LIMIT` | No | Global daily request cap (default: `300`) |
+| `PORT` | No | Server port (default: `3010`) |
+
+## Running Locally
+
+```bash
+# Install dependencies
+cd api && npm install
+
+# Start the server (minimum — chat only)
+GEMINI_API_KEY=your_key node server.js
+
+# Start with all features
+GEMINI_API_KEY=your_key \
+ELEVENLABS_API_KEY=your_key \
+FEEDBACK_WEBHOOK_URL=https://script.google.com/macros/s/.../exec \
+node server.js
+```
+
+## Endpoints
+
+### `POST /api/chat`
+Streaming chat powered by Gemini. Accepts `{ messages: [{ role, content }] }` and returns Server-Sent Events.
+
+### `POST /api/tts`
+Text-to-speech via ElevenLabs. Accepts `{ text: string }` and returns `audio/mpeg` stream.
+
+### `POST /api/feedback`
+Feedback proxy — forwards thumbs-up/down ratings to a Google Sheets webhook. Accepts `{ rating: "up"|"down", question: string, answer: string }`.
+
+## Setting Up Feedback (Google Sheets)
+
+1. Create a Google Sheet with columns: `timestamp`, `rating`, `question`, `answer`
+2. Open **Extensions > Apps Script**
+3. Paste the following:
+
+```javascript
+function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = JSON.parse(e.postData.contents);
+  sheet.appendRow([
+    data.timestamp,
+    data.rating,
+    data.question,
+    data.answer
+  ]);
+  return ContentService.createTextOutput('OK');
+}
+```
+
+4. **Deploy > New deployment** > Type: Web app > Execute as: Me > Who has access: Anyone
+5. Authorize when prompted
+6. Copy the web app URL and set it as `FEEDBACK_WEBHOOK_URL`

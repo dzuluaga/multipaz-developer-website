@@ -37,7 +37,185 @@ function extractFollowUps(text) {
   return questions.length >= 2 ? questions : [];
 }
 
-function MessageBubble({ role, content, showFollowUps, onFollowUp, baseUrl }) {
+function stripMarkdown(text) {
+  return text
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/!\[.*?\]\(.*?\)/g, '')
+    .replace(/\[([^\]]+)\]\(.*?\)/g, '$1')
+    .replace(/#{1,6}\s+/g, '')
+    .replace(/(\*{1,3}|_{1,3})(.*?)\1/g, '$2')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/\n{2,}/g, '\n')
+    .trim();
+}
+
+// tts state: 'idle' | 'loading' | 'playing' | 'error'
+function SpeakerButton({ text, apiUrl }) {
+  const [ttsState, setTtsState] = useState('idle');
+  const audioRef = useRef(null);
+  const blobUrlRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+      }
+    };
+  }, []);
+
+  const handleClick = async () => {
+    // If playing, stop
+    if (ttsState === 'playing' && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setTtsState('idle');
+      return;
+    }
+
+    // If loading, ignore
+    if (ttsState === 'loading') return;
+
+    setTtsState('loading');
+
+    try {
+      const plainText = stripMarkdown(text);
+      if (!plainText) {
+        setTtsState('idle');
+        return;
+      }
+
+      const res = await fetch(`${apiUrl}/api/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: plainText }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const blob = await res.blob();
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+      }
+      const url = URL.createObjectURL(blob);
+      blobUrlRef.current = url;
+
+      const audio = new Audio(url);
+      audioRef.current = audio;
+
+      audio.addEventListener('ended', () => setTtsState('idle'));
+      audio.addEventListener('error', () => setTtsState('error'));
+
+      await audio.play();
+      setTtsState('playing');
+    } catch (err) {
+      console.error('TTS error:', err);
+      setTtsState('error');
+      setTimeout(() => setTtsState('idle'), 2000);
+    }
+  };
+
+  const icons = {
+    idle: (
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+      </svg>
+    ),
+    loading: (
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" className={styles.ttsSpinner}>
+        <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z" />
+      </svg>
+    ),
+    playing: (
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+      </svg>
+    ),
+    error: (
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+      </svg>
+    ),
+  };
+
+  return (
+    <button
+      className={`${styles.ttsButton} ${ttsState === 'playing' ? styles.ttsPlaying : ''} ${ttsState === 'error' ? styles.ttsError : ''}`}
+      onClick={handleClick}
+      aria-label={ttsState === 'playing' ? 'Stop audio' : 'Read aloud'}
+      title={ttsState === 'playing' ? 'Stop' : ttsState === 'error' ? 'TTS error' : 'Read aloud'}
+    >
+      {icons[ttsState]}
+    </button>
+  );
+}
+
+function FeedbackButtons({ question, answer, apiUrl }) {
+  const [rating, setRating] = useState(null); // 'up' | 'down' | null
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleFeedback = async (value) => {
+    if (submitted) return;
+    const newRating = rating === value ? null : value;
+    setRating(newRating);
+
+    if (!newRating) return;
+
+    // POST to feedback endpoint — only lock on success
+    try {
+      const res = await fetch(`${apiUrl}/api/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating: newRating, question, answer }),
+      });
+      if (res.ok) {
+        setSubmitted(true);
+      } else {
+        console.error('Feedback submit error:', res.status);
+        setRating(null);
+      }
+    } catch (err) {
+      console.error('Feedback submit error:', err);
+      setRating(null);
+    }
+  };
+
+  return (
+    <div className={styles.feedbackButtons}>
+      <button
+        className={`${styles.feedbackButton} ${rating === 'up' ? styles.feedbackActive : ''}`}
+        onClick={() => handleFeedback('up')}
+        disabled={submitted && rating !== 'up'}
+        aria-label="Helpful"
+        title="Helpful"
+      >
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+          <path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z" />
+        </svg>
+      </button>
+      <button
+        className={`${styles.feedbackButton} ${rating === 'down' ? styles.feedbackActive : ''}`}
+        onClick={() => handleFeedback('down')}
+        disabled={submitted && rating !== 'down'}
+        aria-label="Not helpful"
+        title="Not helpful"
+      >
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+          <path d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+function MessageBubble({ role, content, question, showFollowUps, onFollowUp, baseUrl, apiUrl }) {
   const followUps = (showFollowUps && role === 'assistant') ? extractFollowUps(content) : [];
   const markdownComponents = {
     code: CodeBlock,
@@ -55,6 +233,12 @@ function MessageBubble({ role, content, showFollowUps, onFollowUp, baseUrl }) {
           <Markdown components={markdownComponents}>{content}</Markdown>
         ) : content}
       </div>
+      {role === 'assistant' && content && (
+        <div className={styles.messageActions}>
+          <FeedbackButtons question={question} answer={content} apiUrl={apiUrl} />
+          <SpeakerButton text={content} apiUrl={apiUrl} />
+        </div>
+      )}
       {followUps.length > 0 && (
         <div className={styles.followUps}>
           {followUps.map((q) => (
@@ -263,16 +447,24 @@ export default function AskAIWidget() {
                 </div>
               </div>
             )}
-            {messages.map((msg, i) => (
-              <MessageBubble
-                key={i}
-                role={msg.role}
-                content={msg.content}
-                showFollowUps={!isLoading && i === messages.length - 1}
-                onFollowUp={handleSend}
-                baseUrl={baseUrl}
-              />
-            ))}
+            {messages.map((msg, i) => {
+              // Find the preceding user message for assistant feedback
+              const question = msg.role === 'assistant' && i > 0 && messages[i - 1].role === 'user'
+                ? messages[i - 1].content
+                : '';
+              return (
+                <MessageBubble
+                  key={i}
+                  role={msg.role}
+                  content={msg.content}
+                  question={question}
+                  showFollowUps={!isLoading && i === messages.length - 1}
+                  onFollowUp={handleSend}
+                  baseUrl={baseUrl}
+                  apiUrl={apiUrl}
+                />
+              );
+            })}
             {isLoading && messages[messages.length - 1]?.role === 'user' && (
               <div className={`${styles.message} ${styles.assistantMessage}`}>
                 <div className={styles.typingIndicator}>
