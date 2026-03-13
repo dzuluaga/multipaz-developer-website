@@ -86,6 +86,8 @@ The site includes an AI chat widget ("Ask AI") that lets developers ask question
 └──────────────────────────────────┘
 ```
 
+See [api/README.md](api/README.md) for API setup, environment variables, and endpoint documentation.
+
 ### How the docs context is built
 
 `api/build-docs-context.js` produces `api/docs-context.txt`, which is the knowledge base sent to Gemini as a system prompt. It aggregates content from two sources:

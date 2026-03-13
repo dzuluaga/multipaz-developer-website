@@ -89,11 +89,30 @@
 .pilotStrip {
   font-size: 11px;
   text-align: center;
-  padding: 4px 8px;
+  padding: 4px 24px 4px 8px;
   background: #fff3cd;
   color: #856404;
   border-bottom: 1px solid #ffeeba;
   flex-shrink: 0;
+  position: relative;
+}
+
+.pilotDismiss {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #856404;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+[data-theme='dark'] .pilotDismiss {
+  color: #ffc107;
 }
 
 .pilotStrip a {
@@ -303,6 +322,77 @@
 .assistantMessage .messageContent a {
   color: var(--ifm-color-primary);
   text-decoration: underline;
+}
+
+/* Message action buttons (feedback + TTS) */
+.messageActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.feedbackButtons {
+  display: flex;
+  gap: 2px;
+}
+
+.feedbackButton {
+  background: none;
+  border: none;
+  padding: 3px;
+  cursor: pointer;
+  color: var(--ifm-color-emphasis-500);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.feedbackButton:hover {
+  color: var(--ifm-color-primary);
+  background: var(--ifm-color-emphasis-200);
+}
+
+.feedbackActive {
+  color: var(--ifm-color-primary);
+}
+
+.ttsButton {
+  background: none;
+  border: none;
+  padding: 3px;
+  cursor: pointer;
+  color: var(--ifm-color-emphasis-500);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.ttsButton:hover {
+  color: var(--ifm-color-primary);
+  background: var(--ifm-color-emphasis-200);
+}
+
+.ttsPlaying {
+  color: var(--ifm-color-primary);
+}
+
+.ttsError {
+  color: var(--ifm-color-danger);
+}
+
+@keyframes ttsSpinAnim {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.ttsSpinner {
+  animation: ttsSpinAnim 1s linear infinite;
 }
 
 /* Typing indicator */
