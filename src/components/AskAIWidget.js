@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Markdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight, oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -93,6 +93,16 @@ export default function AskAIWidget() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+
+  const mountedRef = useRef(false);
+  // Callback ref: scrolls to bottom when the sentinel div first mounts (page refresh, navigation back)
+  const scrollSentinelRef = useCallback((node) => {
+    messagesEndRef.current = node;
+    if (node && !mountedRef.current) {
+      mountedRef.current = true;
+      node.scrollIntoView({ behavior: 'instant' });
+    }
+  }, []);
 
   useEffect(() => {
     sessionStorage.setItem('askAiMessages', JSON.stringify(messages));
@@ -251,7 +261,7 @@ export default function AskAIWidget() {
                 </div>
               </div>
             )}
-            <div ref={messagesEndRef} />
+            <div ref={scrollSentinelRef} />
           </div>
 
           <form className={styles.chatInputForm} onSubmit={handleSubmit}>

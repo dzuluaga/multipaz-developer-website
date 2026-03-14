@@ -67,8 +67,14 @@ async function buildContext() {
     const files = collectMarkdownFiles(dir);
     for (const file of files) {
       const relativePath = path.relative(rootDir, file);
+      // Strip ordering prefixes from filenames (e.g. "01-storage.md" -> "storage.md")
+      // so the AI references actual Docusaurus URL slugs. Only targets short
+      // numeric prefixes (1-3 digits) on the basename to avoid mangling dates.
+      const dir = path.dirname(relativePath);
+      const base = path.basename(relativePath).replace(/^\d{1,3}-/, '');
+      const slugPath = path.join(dir, base);
       const content = fs.readFileSync(file, 'utf-8');
-      context += `\n--- ${relativePath} ---\n${content}\n`;
+      context += `\n--- ${slugPath} ---\n${content}\n`;
     }
   }
 
